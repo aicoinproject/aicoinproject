@@ -1,0 +1,181 @@
+import csv
+import shutil
+
+def modify_and_copy_csv(input_file_path, output_file_path):
+    rows = []
+    value_from_first_column = 0
+    level_number = 0
+    sum_midprice = 0
+    min_midprice = 999999999
+    max_midprice = 100
+    price_increase = 0
+    price_decrease = 0
+    with open(input_file_path, 'r') as input_file:
+        reader = csv.reader(input_file)
+
+        # Read the existing rows and store them in a list
+        for row in reader:
+            rows.append(row)
+
+    # Process the data and modify the list of rows
+    for index in range(len(rows)):
+        if (index + 1) % 6 == 1:  # 6n-1st row
+            level_number = level_number + 1
+            value_from_first_column = float(rows[index][0])
+            value_from_fifth_column = float(rows[index][4])
+           
+
+            # Cal/Put midprice
+            midprice = (value_from_first_column + value_from_fifth_column) / 2
+            rows[index].insert(8, midprice)
+            rows[index+1].insert(8, midprice)
+            rows[index+2].insert(8, midprice)
+            rows[index+3].insert(8, midprice)
+            rows[index+4].insert(8, midprice)
+            
+            #Cal/Put sub
+            sub = -(value_from_first_column - value_from_fifth_column)
+            rows[index].insert(9, sub)
+            rows[index+1].insert(9, sub)
+            rows[index+2].insert(9, sub)
+            rows[index+3].insert(9, sub)
+            rows[index+4].insert(9, sub)
+
+            # Cal sum  and insert it into the 10st column
+            sum =(value_from_first_column + value_from_fifth_column)
+            rows[index].insert(10, sum)
+            rows[index+1].insert(10, sum)
+            rows[index+2].insert(10, sum)
+            rows[index+3].insert(10, sum)
+            rows[index+4].insert(10, sum)
+
+             # Calculate book imbalance and insert it into the 11th column
+            ratio = 0.1
+            interval = 1
+        
+            for i in range(0,9):
+                bidQty = float(rows[index][1])**ratio
+                bidQty = bidQty + (float(rows[index+1][1])**ratio)
+                bidQty = bidQty + (float(rows[index+2][1])**ratio)
+                bidQty = bidQty + (float(rows[index+3][1])**ratio)
+                bidQty = bidQty + (float(rows[index+4][1])**ratio)
+                askQty = float(rows[index][5])**ratio
+                askQty = askQty + (float(rows[index+1][5])**ratio)
+                askQty = askQty + (float(rows[index+2][5])**ratio)
+                askQty = askQty + (float(rows[index+3][5])**ratio)
+                askQty = askQty + (float(rows[index+4][5])**ratio)
+                bidPx = float(rows[index][0])*(float(rows[index][1])**ratio)
+                bidPx = bidPx + float(rows[index+1][0])*(float(rows[index+1][1])**ratio)
+                bidPx = bidPx + float(rows[index+2][0])*(float(rows[index+2][1])**ratio)
+                bidPx = bidPx + float(rows[index+3][0])*(float(rows[index+3][1])**ratio)
+                bidPx = bidPx + float(rows[index+4][0])*(float(rows[index+4][1])**ratio)
+                askPx = float(rows[index][4])*(float(rows[index][5])**ratio)
+                askPx = askPx + float(rows[index+1][4])*(float(rows[index+1][5])**ratio)
+                askPx = askPx + float(rows[index+2][4])*(float(rows[index+2][5])**ratio)
+                askPx = askPx + float(rows[index+3][4])*(float(rows[index+3][5])**ratio)
+                askPx = askPx + float(rows[index+4][4])*(float(rows[index+4][5])**ratio)
+
+                book_price = (((askQty*bidPx)/bidQty) + ((bidQty*askPx)/askQty))/(bidQty+askQty)
+                book_imbalance = (book_price - midprice)/interval
+            
+                rows[index].insert(11+i, book_imbalance)
+                rows[index+1].insert(11+i, book_imbalance)
+                rows[index+2].insert(11+i, book_imbalance)
+                rows[index+3].insert(11+i, book_imbalance)
+                rows[index+4].insert(11+i, book_imbalance)
+                ratio = ratio + 0.1
+
+
+
+            # averagae of mideprice and insert it into the 20st column
+            sum_midprice = sum_midprice + midprice
+            average_midprice = sum_midprice / level_number
+            rows[index].insert(20, average_midprice)
+            rows[index+1].insert(20, average_midprice)
+            rows[index+2].insert(20, average_midprice)
+            rows[index+3].insert(20, average_midprice)
+            rows[index+4].insert(20, average_midprice)
+
+            # Cal stochastic oscillator  and insert it into the 21st column
+
+            if float(min_midprice) > midprice:
+                min_midprice = midprice
+
+            if float(max_midprice) < midprice: 
+                max_midprice = midprice
+
+            if ((max_midprice-min_midprice)!=0):
+                stochastic_oscillator = ((midprice-min_midprice)/(max_midprice-min_midprice))*100
+            else:
+                stochastic_oscillator = 50
+
+            rows[index].insert(21, stochastic_oscillator)
+            rows[index+1].insert(21, stochastic_oscillator)
+            rows[index+2].insert(21, stochastic_oscillator)
+            rows[index+3].insert(21, stochastic_oscillator)
+            rows[index+4].insert(21, stochastic_oscillator)
+
+            # Cal Relative Strength Index(RSI) and insert it into the 22st column
+            
+            if (level_number!=1):
+                if(midprice > past_midprice):
+                    price_increase = price_increase + (midprice - past_midprice)
+                else:
+                    price_decrease = price_decrease + (past_midprice - midprice)
+            past_midprice = midprice       
+            average_increase = price_increase / level_number
+            average_decrease = price_decrease / level_number
+            if (average_decrease!=0):
+                RS = average_increase / average_decrease
+            else:
+                RS = 1
+
+            RSI = 100 - (100/(1+RS))
+
+            rows[index].insert(22, RSI)
+            rows[index+1].insert(22, RSI)
+            rows[index+2].insert(22, RSI)
+            rows[index+3].insert(22, RSI)
+            rows[index+4].insert(22, RSI)
+
+
+
+
+        elif (index + 1) % 6 == 0:
+            rows[index].insert(8, "midprice")
+            rows[index].insert(9, "sub")
+            rows[index].insert(10, "sum")
+            rows[index].insert(11, "book imbalance ratio=0.1")
+            rows[index].insert(12, "ratio=0.2")
+            rows[index].insert(13, "ratio=0.3")
+            rows[index].insert(14, "ratio=0.4")
+            rows[index].insert(15, "ratio=0.5")
+            rows[index].insert(16, "ratio=0.6")
+            rows[index].insert(17, "ratio=0.7")
+            rows[index].insert(18, "ratio=0.8")
+            rows[index].insert(19, "ratio=0.9")
+            rows[index].insert(20, "average midprice")
+            rows[index].insert(21, "stochastic oscillator")
+            rows[index].insert(22, "RSI")
+        
+
+    #오른쪽 4개만 출력하는 코드
+    #with open(output_file_path, 'w', newline='') as output_file:
+     #   writer = csv.writer(output_file)         
+      #  for row in rows:
+       #     writer.writerow(row[7:])
+
+     # # 전체 다 나오게 출력하는 코드
+    with open(output_file_path, 'w', newline='') as output_file:
+        writer = csv.writer(output_file)
+        writer.writerows(rows)
+
+# Example usage
+input_file_path = '2023-1111-1112-bithumb-orderbook.csv'
+output_file_path = '2023-1111-1112-bithumb-market-feature3.csv'
+
+# Copy the existing file to the new file
+shutil.copyfile(input_file_path, output_file_path)
+
+# Modify and add the calculated values and words to the new file
+modify_and_copy_csv(output_file_path, output_file_path)
